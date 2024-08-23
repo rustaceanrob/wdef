@@ -17,7 +17,7 @@ use miniscript::{
 
 /// A type of record that may be recorded in a WDEF file.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct RecordType(u8);
+struct RecordType(u8);
 
 impl RecordType {
     /// A canonical name for the wallet.
@@ -78,41 +78,46 @@ impl Record {
             // `as_bytes` encodes the string as a UTF-8 byte array
             Record::Name(name) => {
                 let byte_encoding = name.as_bytes();
-                let mut buf = Self::encode_message(RecordType::NAME, byte_encoding)?;
-                let checksum = Self::calc_checksum(RecordType::NAME, byte_encoding);
+                let record_type = RecordType::NAME;
+                let mut buf = Self::encode_message(record_type, byte_encoding)?;
+                let checksum = Self::calc_checksum(record_type, byte_encoding);
                 buf.extend(&checksum);
                 buf
             }
             Record::Description(description) => {
                 let byte_encoding = description.as_bytes();
-                let mut buf = Self::encode_message(RecordType::DESCRIPTION, byte_encoding)?;
-                let checksum = Self::calc_checksum(RecordType::DESCRIPTION, byte_encoding);
+                let record_type = RecordType::DESCRIPTION;
+                let mut buf = Self::encode_message(record_type, byte_encoding)?;
+                let checksum = Self::calc_checksum(record_type, byte_encoding);
                 buf.extend(&checksum);
                 buf
             }
             Record::RecoveryHeight(height) => {
                 let height_bytes = height.to_le_bytes();
+                let record_type = RecordType::RECOVERY_HEIGHT;
                 let len: u16 = 4;
-                buf.push(RecordType::RECOVERY_HEIGHT.into());
+                buf.push(record_type.into());
                 buf.extend(len.to_le_bytes());
                 buf.extend(height_bytes);
-                let checksum = Self::calc_checksum(RecordType::RECOVERY_HEIGHT, &height_bytes);
+                let checksum = Self::calc_checksum(record_type, &height_bytes);
                 buf.extend(&checksum);
                 buf
             }
             Record::PublicDescriptor(pub_desc) => {
                 let string_encoding = pub_desc.to_string();
                 let byte_encoding = string_encoding.as_bytes();
-                let mut buf = Self::encode_message(RecordType::PUB_DESC, byte_encoding)?;
-                let checksum = Self::calc_checksum(RecordType::PUB_DESC, byte_encoding);
+                let record_type = RecordType::PUB_DESC;
+                let mut buf = Self::encode_message(record_type, byte_encoding)?;
+                let checksum = Self::calc_checksum(record_type, byte_encoding);
                 buf.extend(&checksum);
                 buf
             }
             Record::PrivateDescriptor(priv_desc) => {
                 let string_encoding = priv_desc.to_string();
                 let byte_encoding = string_encoding.as_bytes();
-                let mut buf = Self::encode_message(RecordType::PRIV_DESC, byte_encoding)?;
-                let checksum = Self::calc_checksum(RecordType::PRIV_DESC, byte_encoding);
+                let record_type = RecordType::PRIV_DESC;
+                let mut buf = Self::encode_message(record_type, byte_encoding)?;
+                let checksum = Self::calc_checksum(record_type, byte_encoding);
                 buf.extend(&checksum);
                 buf
             }
@@ -233,13 +238,21 @@ pub fn decode_records(mut reader: impl io::Read + Send + Sync) -> Result<Vec<Rec
 
 #[derive(Debug)]
 pub enum Error {
+    /// Too many records were encoded.
     RecordCountOverflow,
+    /// A record is too large to be encoded.
     RecordLengthOverflow,
+    /// The end of the file was reached before decoding finished.
     UnexpectedEOF,
+    /// A message type present in the file was not recognized.
     UnknownMessageType,
+    /// A checksum present in the file did not match what was computed.
     InvalidChecksum,
+    /// An encoding could not be parsed as UTF-8.
     InvalidUTF8,
+    /// A height could not be parsed into 16-bits.
     InvalidHeightEncoding,
+    /// A string did not parse into a descriptor properly.
     InvalidDescriptor,
 }
 
