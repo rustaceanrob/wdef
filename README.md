@@ -22,7 +22,7 @@ _double-SHA256_ is a hash algorithm defined by two invocations of SHA-256: `doub
 
 Information is stored in a WDEF file in the form of `Record`s. A `Record` is a tuple of a `Type`, `Length`, and `Value`, followed by a 4 byte checksum. Every WDEF file is prefixed with a single byte representing the number of records in the file. A record type is represented as a byte, with possible types listed below:
 
-| Record Type (`Type`) | Value (u8) | Description                        |
+| Record Type (`Type`) | Value (`u8`) | Description                        |
 | ------------------- | ---------- | ---------------------------------- |
 | Name | 0x00 | The name of the wallet in the file |
 | Description | 0x01 | Summary of this wallet's use(s) |
@@ -30,7 +30,7 @@ Information is stored in a WDEF file in the form of `Record`s. A `Record` is a t
 | PublicDescriptor | 0x03 | A descriptor that encodes public keys and cannot spend bitcoins |
 | PrivateDescriptor | 0x03 | A descriptor that encodes secret keys and may spend bitcoins |
 
-A length is a 16-bit number represented as bytes in _little endian_. The length represents the number of bytes in the value encoding that follows.
+A `Length` is a 16-bit number represented as bytes in _little endian_. The length represents the number of bytes in the value encoding that follows.
 
 `Name`, `Description`, `PublicDescriptor`, and `PrivateDescriptor` are all represented as strings and encoded as the UTF-8 byte array
 for such a string representation. `RecoveryHeight`s are represented as a 4 byte _little endian_ array representation.
@@ -63,7 +63,9 @@ The first byte is read from the file and interpreted as the number of records. F
 
 5. Read the next 4 bytes and fail if the calculated and presented checksum do not match.
 
-6. For descriptors, parse the computed string. Decoding fails for if the provided string cannot be cast to a descriptor.
+6. For descriptors, parse the computed string and attempt to cast it to a descriptor. Decoding fails for if the provided string cannot be cast to a descriptor.
+
+Files adhering to this standard should be postfixed with the `.wdef` extension.
 
 ### Rationale
 
@@ -74,7 +76,5 @@ Descriptor `Value`s are represented strings for the following reasons:
 2. UTF-8 encodings are an open standard with forwards compatability for new `Type`s.
 
 3. Most encoding logic may be shared for each `Type`.
-
-A height is used as opposed to a block hash, as heights are human readable. 
 
 The checksum is added to ensure that invalid `Record` encodings are discovered during decoding and file integrity is guaranteed when successfully parsing a WDEF file.
