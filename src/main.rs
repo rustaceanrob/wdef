@@ -15,18 +15,20 @@ use miniscript::{
     DescriptorPublicKey,
 };
 
+/// A type of record that may be recorded in a WDEF file.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct RecordType(u8);
 
 impl RecordType {
+    /// A canonical name for the wallet.
     pub const NAME: RecordType = RecordType(0x00);
-
+    /// A description of the wallet.
     pub const DESCRIPTION: RecordType = RecordType(0x01);
-
+    /// The height in the chain of most work to start scanning for transactions.
     pub const RECOVERY_HEIGHT: RecordType = RecordType(0x02);
-
+    /// A descriptor that is inheritantly safe to share.
     pub const PUB_DESC: RecordType = RecordType(0x03);
-
+    /// A descriptor with secret information that could spend bitcoins.
     pub const PRIV_DESC: RecordType = RecordType(0x04);
 }
 
@@ -36,6 +38,7 @@ impl From<RecordType> for u8 {
     }
 }
 
+/// Records and associated content.
 #[allow(dead_code)]
 #[derive(Debug)]
 pub enum Record {
