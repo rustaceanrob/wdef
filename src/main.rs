@@ -24,10 +24,12 @@ impl RecordType {
     pub const NAME: RecordType = RecordType(0x00);
     /// A description of the wallet.
     pub const DESCRIPTION: RecordType = RecordType(0x01);
+    /// A description of the wallet.
+    pub const INFO: RecordType = RecordType(0x02);
     /// The height in the chain of most work to start scanning for transactions.
-    pub const RECOVERY_HEIGHT: RecordType = RecordType(0x02);
+    pub const RECOVERY_HEIGHT: RecordType = RecordType(0x03);
     /// A descriptor that is inheritantly safe to share.
-    pub const PUB_DESC: RecordType = RecordType(0x03);
+    pub const PUB_DESC: RecordType = RecordType(0x04);
 }
 
 impl From<RecordType> for u8 {
@@ -42,6 +44,7 @@ impl From<RecordType> for u8 {
 pub enum Record {
     Name(String),
     Description(String),
+    Info(String),
     RecoveryHeight(u32),
     PublicDescriptor(DescriptorPublicKey),
 }
@@ -54,6 +57,9 @@ impl Display for Record {
             }
             Record::Description(description) => {
                 write!(f, "Wallet description: {description}")
+            }
+            Record::Info(info) => {
+                write!(f, "Additional information: {info}")
             }
             Record::RecoveryHeight(height) => {
                 write!(f, "Height to fully recover the wallet: {height}")
@@ -81,6 +87,14 @@ impl Record {
             Record::Description(description) => {
                 let byte_encoding = description.as_bytes();
                 let record_type = RecordType::DESCRIPTION;
+                let mut buf = Self::encode_message(record_type, byte_encoding)?;
+                let checksum = Self::calc_checksum(record_type, byte_encoding);
+                buf.extend(&checksum);
+                buf
+            }
+            Record::Info(info) => {
+                let byte_encoding = info.as_bytes();
+                let record_type = RecordType::INFO;
                 let mut buf = Self::encode_message(record_type, byte_encoding)?;
                 let checksum = Self::calc_checksum(record_type, byte_encoding);
                 buf.extend(&checksum);
@@ -193,6 +207,9 @@ pub fn decode_records(mut reader: impl io::Read + Send + Sync) -> Result<Vec<Rec
             RecordType::DESCRIPTION => {
                 Record::Description(String::from_utf8(record_buf).map_err(|_| Error::InvalidUTF8)?)
             }
+            RecordType::INFO => {
+                Record::Info(String::from_utf8(record_buf).map_err(|_| Error::InvalidUTF8)?)
+            }
             RecordType::RECOVERY_HEIGHT => {
                 let height: u32 = u32::from_le_bytes(
                     record_buf
@@ -264,6 +281,7 @@ fn main() {
     // Wallet metadata
     let name = Record::Name("My wallet".into());
     let description = Record::Description("Very important description".into());
+    let info = Record::Info("Check the cubbards".into());
     let height = Record::RecoveryHeight(840_000);
     // Generate a key
     let secret = SecretKey::from_slice(&[0xCD; 32]).unwrap();
@@ -276,7 +294,7 @@ fn main() {
     // Add the key as a record
     let desc_record = Record::PublicDescriptor(desc_pub);
     // Write the records to a file
-    let records = vec![name, description, height, desc_record];
+    let records = vec![name, description, info, height, desc_record];
     let buf = encode_records(records).unwrap();
     let file = std::fs::File::create("my_wallet.wdef").unwrap();
     let mut writer = std::io::BufWriter::new(&file);

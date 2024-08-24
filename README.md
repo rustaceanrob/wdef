@@ -24,12 +24,13 @@ Information is stored in a WDEF file in the form of `Record`s. A `Record` is a t
 | ------------------- | ---------- | ---------------------------------- |
 | Name | 0x00 | The name of the wallet in the file |
 | Description | 0x01 | Summary of this wallet's use(s) |
-| RecoveryHeight | 0x02 | Height in the blockchain this began to receive and send payments |
-| PublicDescriptor | 0x03 | A descriptor that encodes public keys and cannot spend bitcoins |
+| Info | 0x02 | Any additional information to recover funds |
+| RecoveryHeight | 0x03 | Height in the blockchain this wallet began to receive and send payments |
+| PublicDescriptor | 0x04 | A descriptor that encodes public keys and cannot spend bitcoins |
 
 A `Length` is a 16-bit number represented as bytes in _little endian_. The length represents the number of bytes in the value encoding that follows.
 
-`Name`, `Description`, `PublicDescriptor` are all represented as strings and encoded as the UTF-8 byte array
+`Name`, `Description`, `Info`, and `PublicDescriptor` are all represented as strings and encoded as the UTF-8 byte array
 for such a string representation. `RecoveryHeight`s are represented as a 4 byte _little endian_ array representation.
 
 The checksum for a `Record` is calculated by `SHA256( Type || Value )` and taking the first four bytes of the resulting hash.
