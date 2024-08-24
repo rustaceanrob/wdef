@@ -24,7 +24,7 @@ impl RecordType {
     pub const NAME: RecordType = RecordType(0x00);
     /// A description of the wallet.
     pub const DESCRIPTION: RecordType = RecordType(0x01);
-    /// A description of the wallet.
+    /// Additional information as to how to recover the wallet.
     pub const INFO: RecordType = RecordType(0x02);
     /// The height in the chain of most work to start scanning for transactions.
     pub const RECOVERY_HEIGHT: RecordType = RecordType(0x03);
