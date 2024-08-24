@@ -6,12 +6,12 @@ use std::{
 
 use miniscript::{
     bitcoin::{
-        hashes::{sha256d, Hash},
+        hashes::{sha256, Hash},
         key::Secp256k1,
         secp256k1::SecretKey,
         Network, PrivateKey, PublicKey,
     },
-    descriptor::{DescriptorSecretKey, SinglePub, SinglePubKey},
+    descriptor::{SinglePub, SinglePubKey},
     DescriptorPublicKey,
 };
 
@@ -28,8 +28,6 @@ impl RecordType {
     pub const RECOVERY_HEIGHT: RecordType = RecordType(0x02);
     /// A descriptor that is inheritantly safe to share.
     pub const PUB_DESC: RecordType = RecordType(0x03);
-    /// A descriptor with secret information that could spend bitcoins.
-    pub const PRIV_DESC: RecordType = RecordType(0x04);
 }
 
 impl From<RecordType> for u8 {
@@ -46,7 +44,6 @@ pub enum Record {
     Description(String),
     RecoveryHeight(u32),
     PublicDescriptor(DescriptorPublicKey),
-    PrivateDescriptor(DescriptorSecretKey),
 }
 
 impl Display for Record {
@@ -63,9 +60,6 @@ impl Display for Record {
             }
             Record::PublicDescriptor(desc) => {
                 write!(f, "Descriptor public key: {desc}")
-            }
-            Record::PrivateDescriptor(_) => {
-                write!(f, "Private Descriptors are not displayed.")
             }
         }
     }
@@ -112,15 +106,6 @@ impl Record {
                 buf.extend(&checksum);
                 buf
             }
-            Record::PrivateDescriptor(priv_desc) => {
-                let string_encoding = priv_desc.to_string();
-                let byte_encoding = string_encoding.as_bytes();
-                let record_type = RecordType::PRIV_DESC;
-                let mut buf = Self::encode_message(record_type, byte_encoding)?;
-                let checksum = Self::calc_checksum(record_type, byte_encoding);
-                buf.extend(&checksum);
-                buf
-            }
         };
         Ok(bytes)
     }
@@ -145,7 +130,7 @@ impl Record {
         // Commit the message type and message
         hash_buf.extend_from_slice(&message_type.0.to_le_bytes());
         hash_buf.extend(message);
-        let hash = sha256d::Hash::hash(&hash_buf);
+        let hash = sha256::Hash::hash(&hash_buf);
         let checksum: [u8; 4] = hash.to_byte_array()[..4].try_into().unwrap();
         checksum
     }
@@ -221,12 +206,6 @@ pub fn decode_records(mut reader: impl io::Read + Send + Sync) -> Result<Vec<Rec
                 let desc = DescriptorPublicKey::from_str(&desc_string)
                     .map_err(|_| Error::InvalidDescriptor)?;
                 Record::PublicDescriptor(desc)
-            }
-            RecordType::PRIV_DESC => {
-                let desc_string = String::from_utf8(record_buf).map_err(|_| Error::InvalidUTF8)?;
-                let desc = DescriptorSecretKey::from_str(&desc_string)
-                    .map_err(|_| Error::InvalidDescriptor)?;
-                Record::PrivateDescriptor(desc)
             }
             _ => return Err(Error::UnknownMessageType),
         };
