@@ -4,7 +4,7 @@ Wallet descriptor export format (WDEF) is a proposal for a standard file format 
 
 ### Motivation
 
-The purpose of a standarized file format is to decrease the chance of loss of funds in the case of wallet recovery or inheritance. BIP32 seed phrases are not sufficient information to recover a wallet if multiple signers are used, a non-standard derivation path is used, or if the recoveree does not know what to do with such seed phrase. A unified file format allows for "one-click" backups and recoveries for descriptor-based bitcoin wallets.
+The purpose of a standarized file format is to decrease the chance of loss of funds in the case of wallet recovery or inheritance. BIP32 seed phrases are not sufficient information to recover a wallet if multiple signers are used, a non-standard derivation path is used, or if the recoveree does not know what to do with such seed phrase. Moreover, seed phrases must be entered into a device to recover wallet public keys. A unified file format allows for "one-click" backups and recoveries for descriptor-based bitcoin wallets, and allows for watch-only wallet recoveries without entering seed phrases into potentially untrusted devices.
 
 ### Definitions
 
@@ -38,10 +38,10 @@ for such a string representation. `RecoveryHeight`s are represented as a 4 byte 
 The checksum for a `Record` is calculated by `double-SHA256( Type || Value )` and taking the first four bytes of the resulting hash.
 
 A `Record` is completely defined as:
-- `Type`: `[1]byte` ID
-- `Length`: `[2]byte` _little endian_ value representing the length of the next field
-- `Value`: `[]byte` variable length contents representing the record type
-- Checksum: `[4] byte` a commitment to the record type and record value
+- `Type`: `[1]bytes` ID
+- `Length`: `[2]bytes` _little endian_ value representing the length of the next field
+- `Value`: `[]bytes` variable length contents representing the record type, often a UTF-8 encoded string
+- `Checksum`: `[4] bytes` a commitment to the record type and record value
 
 #### Encoding Files
 
