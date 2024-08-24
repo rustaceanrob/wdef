@@ -1,12 +1,14 @@
 ### About/Abstract
 
-Wallet descriptor export format (WDEF) is a proposal for a standard file format to export and import descriptor-based Bitcoin wallets. The details of the specification are outlined below.
+Wallet descriptor export format (WDEF) is a proposal for a standard file format to export and import descriptor-based Bitcoin wallets.
 
 ### Motivation
 
 The purpose of a standarized file format is to decrease the chance of loss of funds in the case of wallet recovery or inheritance. BIP32 seed phrases are not sufficient information to recover funds if multiple signers are used, a non-standard derivation path is used, or if the recoverer does not know what to do with such seed phrase. Moreover, seed phrases must be entered into a device to recover wallet public keys. Output script descriptors resolve these problems, however the process of storing, exporting, and sharing descriptors is currently determined by users. A unified file format allows for "one-click" backups and recoveries for descriptor-based bitcoin wallets, transferring the responsibilities of handling descriptors from users to software.
 
-Output script descriptors are often exported, shared, and stored in `.txt` files, but other formats such as JSON are also used. This discrepancy causes developer burden, and varying formats cause uncertainty of support for parsing such data in future wallet software. If descriptor parsing from a `txt` or `json` file fails, it is up to the heir or recoverer to resolve the problem. A unifed file format for importing and exporting descriptors not only decreases developer burden, but allows for a higher degree of certainty that an heir will not have to manually "copy and paste" descriptors into future software. Files are portable, duplicable, and easily parsed by most devices.
+Output script descriptors are often exported, shared, and stored in `.txt` files, but other formats such as JSON are also used. This discrepancy causes developer burden, and varying formats cause uncertainty of support for parsing such data in future wallet software. If descriptor parsing from a `txt` or `json` file fails, it is up to the heir or recoverer to resolve the problem. A unifed file format for importing and exporting descriptors not only decreases developer burden, but allows for a higher degree of certainty that an heir will not have to manually "copy and paste" descriptors into future software. Files are portable, duplicable, and easily parsed by most devices. Files may also be encrypted and safely shared with attorneys, business partners, or other semi-trusted entities.
+
+Futher still, metadata about the descriptors, such as the name of the wallet, a description of its uses, where to start scanning for ouputs, and additional information to recover signers are either encoded as a comment in the `.txt`, introducing difficulty for software to parse reliably, or fields in a JSON, introducing forward-compatiblity concerns for future wallet software. These fields are easily encoded and decoded with a standard format.
 
 ### Definitions
 

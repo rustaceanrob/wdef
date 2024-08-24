@@ -28,8 +28,10 @@ impl RecordType {
     pub const INFO: RecordType = RecordType(0x02);
     /// The height in the chain of most work to start scanning for transactions.
     pub const RECOVERY_HEIGHT: RecordType = RecordType(0x03);
-    /// A descriptor that is inheritantly safe to share.
+    /// A descriptor that is used to receive payments.
     pub const EXTERNAL_DESCRIPTOR: RecordType = RecordType(0x04);
+    /// A descriptor that is used to receive change when transacting.
+    pub const INTERNAL_DESCRIPTOR: RecordType = RecordType(0x05);
 }
 
 impl From<RecordType> for u8 {
@@ -47,6 +49,7 @@ pub enum Record {
     Info(String),
     RecoveryHeight(u32),
     ExternalDescriptor(DescriptorPublicKey),
+    InternalDescriptor(DescriptorPublicKey),
 }
 
 impl Display for Record {
@@ -67,6 +70,9 @@ impl Display for Record {
             Record::ExternalDescriptor(desc) => {
                 write!(f, "Receiving descriptor: {desc}")
             }
+            Record::InternalDescriptor(desc) => {
+                write!(f, "Changer descriptor: {desc}")
+            },
         }
     }
 }
@@ -111,10 +117,19 @@ impl Record {
                 buf.extend(&checksum);
                 buf
             }
-            Record::ExternalDescriptor(internal) => {
-                let string_encoding = internal.to_string();
+            Record::ExternalDescriptor(desc) => {
+                let string_encoding = desc.to_string();
                 let byte_encoding = string_encoding.as_bytes();
                 let record_type = RecordType::EXTERNAL_DESCRIPTOR;
+                let mut buf = Self::encode_message(record_type, byte_encoding)?;
+                let checksum = Self::calc_checksum(record_type, byte_encoding);
+                buf.extend(&checksum);
+                buf
+            }
+            Record::InternalDescriptor(desc) => {
+                let string_encoding = desc.to_string();
+                let byte_encoding = string_encoding.as_bytes();
+                let record_type = RecordType::INTERNAL_DESCRIPTOR;
                 let mut buf = Self::encode_message(record_type, byte_encoding)?;
                 let checksum = Self::calc_checksum(record_type, byte_encoding);
                 buf.extend(&checksum);
@@ -223,6 +238,12 @@ pub fn decode_records(mut reader: impl io::Read + Send + Sync) -> Result<Vec<Rec
                 let desc = DescriptorPublicKey::from_str(&desc_string)
                     .map_err(|_| Error::InvalidDescriptor)?;
                 Record::ExternalDescriptor(desc)
+            }
+            RecordType::INTERNAL_DESCRIPTOR => {
+                let desc_string = String::from_utf8(record_buf).map_err(|_| Error::InvalidUTF8)?;
+                let desc = DescriptorPublicKey::from_str(&desc_string)
+                    .map_err(|_| Error::InvalidDescriptor)?;
+                Record::InternalDescriptor(desc)
             }
             _ => return Err(Error::UnknownMessageType),
         };
