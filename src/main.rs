@@ -29,7 +29,7 @@ impl RecordType {
     /// The height in the chain of most work to start scanning for transactions.
     pub const RECOVERY_HEIGHT: RecordType = RecordType(0x03);
     /// A descriptor that is inheritantly safe to share.
-    pub const PUB_DESC: RecordType = RecordType(0x04);
+    pub const EXTERNAL_DESCRIPTOR: RecordType = RecordType(0x04);
 }
 
 impl From<RecordType> for u8 {
@@ -46,7 +46,7 @@ pub enum Record {
     Description(String),
     Info(String),
     RecoveryHeight(u32),
-    PublicDescriptor(DescriptorPublicKey),
+    ExternalDescriptor(DescriptorPublicKey),
 }
 
 impl Display for Record {
@@ -64,8 +64,8 @@ impl Display for Record {
             Record::RecoveryHeight(height) => {
                 write!(f, "Height to fully recover the wallet: {height}")
             }
-            Record::PublicDescriptor(desc) => {
-                write!(f, "Descriptor public key: {desc}")
+            Record::ExternalDescriptor(desc) => {
+                write!(f, "Receiving descriptor: {desc}")
             }
         }
     }
@@ -111,10 +111,10 @@ impl Record {
                 buf.extend(&checksum);
                 buf
             }
-            Record::PublicDescriptor(pub_desc) => {
-                let string_encoding = pub_desc.to_string();
+            Record::ExternalDescriptor(internal) => {
+                let string_encoding = internal.to_string();
                 let byte_encoding = string_encoding.as_bytes();
-                let record_type = RecordType::PUB_DESC;
+                let record_type = RecordType::EXTERNAL_DESCRIPTOR;
                 let mut buf = Self::encode_message(record_type, byte_encoding)?;
                 let checksum = Self::calc_checksum(record_type, byte_encoding);
                 buf.extend(&checksum);
@@ -218,11 +218,11 @@ pub fn decode_records(mut reader: impl io::Read + Send + Sync) -> Result<Vec<Rec
                 );
                 Record::RecoveryHeight(height)
             }
-            RecordType::PUB_DESC => {
+            RecordType::EXTERNAL_DESCRIPTOR => {
                 let desc_string = String::from_utf8(record_buf).map_err(|_| Error::InvalidUTF8)?;
                 let desc = DescriptorPublicKey::from_str(&desc_string)
                     .map_err(|_| Error::InvalidDescriptor)?;
-                Record::PublicDescriptor(desc)
+                Record::ExternalDescriptor(desc)
             }
             _ => return Err(Error::UnknownMessageType),
         };
@@ -292,7 +292,7 @@ fn main() {
         key: SinglePubKey::FullKey(pub_key),
     });
     // Add the key as a record
-    let desc_record = Record::PublicDescriptor(desc_pub);
+    let desc_record = Record::ExternalDescriptor(desc_pub);
     // Write the records to a file
     let records = vec![name, description, info, height, desc_record];
     let buf = encode_records(records).unwrap();
