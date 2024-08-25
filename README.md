@@ -62,13 +62,13 @@ The first byte is read from the file and interpreted as the number of records. F
 
 2. Read the next two bytes and interpret them as an 16-bit unsigned integer, denoted `L`
 
-3. Read the next `L` bytes and parse as a UTF-8 string. Decoding fails if the bytes cannot be parsed as UTF-8.
+3. Read the next `L` bytes and parse into the desired representation. Decoding fails if the bytes cannot be parsed.
 
 4. Calculate the checksum using the `Value` and `Type`
 
 5. Read the next 4 bytes and fail if the calculated and presented checksum do not match.
 
-6. For descriptors, parse the computed string and attempt to cast it to a descriptor. Decoding fails for if the provided string cannot be cast to a descriptor.
+6. For descriptors, parse the computed string and attempt to cast it to a descriptor that encodes public keys. Decoding fails for if the provided string cannot be cast to a public key descriptor.
 
 If one or more descriptors are not present, decoding fails.
 
