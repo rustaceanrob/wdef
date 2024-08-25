@@ -1,7 +1,6 @@
 use std::{
     fmt::Display,
     io::{self, Write},
-    str::FromStr,
 };
 
 use miniscript::{
@@ -72,7 +71,7 @@ impl Display for Record {
             }
             Record::InternalDescriptor(desc) => {
                 write!(f, "Changer descriptor: {desc}")
-            },
+            }
         }
     }
 }
@@ -165,6 +164,7 @@ impl Record {
     }
 }
 
+/// Encode records into a byte array.
 pub fn encode_records(records: Vec<Record>) -> Result<Vec<u8>, Error> {
     let mut buf = Vec::new();
     let len: u8 = records
@@ -178,6 +178,7 @@ pub fn encode_records(records: Vec<Record>) -> Result<Vec<u8>, Error> {
     Ok(buf)
 }
 
+// Decode a sequence of records from a file.
 pub fn decode_records(mut reader: impl io::Read + Send + Sync) -> Result<Vec<Record>, Error> {
     let mut records = Vec::new();
     // The first byte commits to the length
@@ -235,13 +236,15 @@ pub fn decode_records(mut reader: impl io::Read + Send + Sync) -> Result<Vec<Rec
             }
             RecordType::EXTERNAL_DESCRIPTOR => {
                 let desc_string = String::from_utf8(record_buf).map_err(|_| Error::InvalidUTF8)?;
-                let desc = DescriptorPublicKey::from_str(&desc_string)
+                let desc = desc_string
+                    .parse::<DescriptorPublicKey>()
                     .map_err(|_| Error::InvalidDescriptor)?;
                 Record::ExternalDescriptor(desc)
             }
             RecordType::INTERNAL_DESCRIPTOR => {
                 let desc_string = String::from_utf8(record_buf).map_err(|_| Error::InvalidUTF8)?;
-                let desc = DescriptorPublicKey::from_str(&desc_string)
+                let desc = desc_string
+                    .parse::<DescriptorPublicKey>()
                     .map_err(|_| Error::InvalidDescriptor)?;
                 Record::InternalDescriptor(desc)
             }
