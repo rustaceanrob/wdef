@@ -9,9 +9,7 @@ use miniscript::{
         key::Secp256k1,
         secp256k1::SecretKey,
         Network, PrivateKey, PublicKey,
-    },
-    descriptor::{SinglePub, SinglePubKey},
-    DescriptorPublicKey,
+    }, descriptor::{SinglePub, SinglePubKey}, Descriptor, DescriptorPublicKey
 };
 
 /// A type of record that may be recorded in a WDEF file.
@@ -47,8 +45,8 @@ pub enum Record {
     Description(String),
     Info(String),
     RecoveryHeight(u32),
-    ExternalDescriptor(DescriptorPublicKey),
-    InternalDescriptor(DescriptorPublicKey),
+    ExternalDescriptor(Descriptor<DescriptorPublicKey>),
+    InternalDescriptor(Descriptor<DescriptorPublicKey>),
 }
 
 impl Display for Record {
@@ -237,14 +235,14 @@ pub fn decode_records(mut reader: impl io::Read + Send + Sync) -> Result<Vec<Rec
             RecordType::EXTERNAL_DESCRIPTOR => {
                 let desc_string = String::from_utf8(record_buf).map_err(|_| Error::InvalidUTF8)?;
                 let desc = desc_string
-                    .parse::<DescriptorPublicKey>()
+                    .parse::<Descriptor<DescriptorPublicKey>>()
                     .map_err(|_| Error::InvalidDescriptor)?;
                 Record::ExternalDescriptor(desc)
             }
             RecordType::INTERNAL_DESCRIPTOR => {
                 let desc_string = String::from_utf8(record_buf).map_err(|_| Error::InvalidUTF8)?;
                 let desc = desc_string
-                    .parse::<DescriptorPublicKey>()
+                    .parse::<Descriptor<DescriptorPublicKey>>()
                     .map_err(|_| Error::InvalidDescriptor)?;
                 Record::InternalDescriptor(desc)
             }
@@ -315,8 +313,9 @@ fn main() {
         origin: None,
         key: SinglePubKey::FullKey(pub_key),
     });
+    let desc = Descriptor::new_pk(desc_pub);
     // Add the key as a record
-    let desc_record = Record::ExternalDescriptor(desc_pub);
+    let desc_record = Record::ExternalDescriptor(desc);
     // Write the records to a file
     let records = vec![name, description, info, height, desc_record];
     let buf = encode_records(records).unwrap();
