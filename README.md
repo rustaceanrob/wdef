@@ -2,6 +2,11 @@
 
 Wallet descriptor export format (WDEF) is a proposal for a standard file format to export and import descriptor-based Bitcoin wallets.
 
+To run the example:
+```
+cargo run --example main
+```
+
 ### Motivation
 
 The purpose of a standarized file format is to decrease the chance of loss of funds in the case of wallet recovery or inheritance. BIP32 seed phrases are not sufficient information to recover funds if multiple signers are used, a non-standard derivation path is used, or if the recoverer does not know what to do with such seed phrase. Moreover, seed phrases must be entered into a device to recover wallet public keys. Output descriptors alleviate these issues, however the process of storing, exporting, and sharing descriptors is currently determined by users. A unified file format allows for "one-click" backups and recoveries for descriptor-based bitcoin wallets, transferring the responsibilities of handling descriptors from users to software.

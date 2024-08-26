@@ -1,16 +1,8 @@
-use std::{
-    fmt::Display,
-    io::{self, Write},
-};
+use core::fmt::Display;
 
-use miniscript::{
-    bitcoin::{
-        hashes::{sha256, Hash},
-        key::Secp256k1,
-        secp256k1::SecretKey,
-        Network, PrivateKey, PublicKey,
-    }, descriptor::{SinglePub, SinglePubKey}, Descriptor, DescriptorPublicKey
-};
+use miniscript::bitcoin::hashes::{sha256, Hash};
+
+pub use miniscript::{Descriptor, DescriptorPublicKey};
 
 /// A type of record that may be recorded in a WDEF file.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -176,8 +168,8 @@ pub fn encode_records(records: Vec<Record>) -> Result<Vec<u8>, Error> {
     Ok(buf)
 }
 
-// Decode a sequence of records from a file.
-pub fn decode_records(mut reader: impl io::Read + Send + Sync) -> Result<Vec<Record>, Error> {
+/// Decode a sequence of records from a file.
+pub fn decode_records(mut reader: impl std::io::Read + Send + Sync) -> Result<Vec<Record>, Error> {
     let mut records = Vec::new();
     // The first byte commits to the length
     let mut len_byte = [0; 1];
@@ -254,6 +246,7 @@ pub fn decode_records(mut reader: impl io::Read + Send + Sync) -> Result<Vec<Rec
     Ok(records)
 }
 
+/// Possible errors when encoding and decoding a WDEF
 #[derive(Debug)]
 pub enum Error {
     /// Too many records were encoded.
@@ -298,39 +291,3 @@ impl Display for Error {
 }
 
 impl std::error::Error for Error {}
-
-fn main() {
-    // Wallet metadata
-    let name = Record::Name("My wallet".into());
-    let description = Record::Description("Very important description".into());
-    let info = Record::Info("Check the cubbards".into());
-    let height = Record::RecoveryHeight(840_000);
-    // Generate a key
-    let secret = SecretKey::from_slice(&[0xCD; 32]).unwrap();
-    let priv_key = PrivateKey::new(secret, Network::Regtest);
-    let pub_key = PublicKey::from_private_key(&Secp256k1::new(), &priv_key);
-    let desc_pub = DescriptorPublicKey::Single(SinglePub {
-        origin: None,
-        key: SinglePubKey::FullKey(pub_key),
-    });
-    let desc = Descriptor::new_pk(desc_pub);
-    // Add the key as a record
-    let desc_record = Record::ExternalDescriptor(desc);
-    // Write the records to a file
-    let records = vec![name, description, info, height, desc_record];
-    let buf = encode_records(records).unwrap();
-    let file = std::fs::File::create("my_wallet.wdef").unwrap();
-    let mut writer = std::io::BufWriter::new(&file);
-    writer.write_all(&buf).unwrap();
-    writer.flush().unwrap();
-    drop(writer);
-    drop(file);
-    // Open the file
-    let file = std::fs::File::open("my_wallet.wdef").unwrap();
-    let reader = std::io::BufReader::new(&file);
-    // Decode into a list of records
-    let records = decode_records(reader).unwrap();
-    for record in records {
-        println!("{record}");
-    }
-}

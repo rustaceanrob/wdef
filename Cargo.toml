@@ -7,3 +7,11 @@ edition = "2021"
 
 [dependencies]
 miniscript = "12.2.0"
+
+[lib]
+name = "wdef"
+path = "src/lib.rs"
+
+[[example]]
+name = "main"
+path = "example/main.rs"
