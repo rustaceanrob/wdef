@@ -10,17 +10,17 @@ struct RecordType(u8);
 
 impl RecordType {
     /// A canonical name for the wallet.
-    pub const NAME: RecordType = RecordType(0x00);
+    const NAME: RecordType = RecordType(0x00);
     /// A description of the wallet.
-    pub const DESCRIPTION: RecordType = RecordType(0x01);
+    const DESCRIPTION: RecordType = RecordType(0x01);
     /// Additional information as to how to recover the wallet.
-    pub const INFO: RecordType = RecordType(0x02);
+    const INFO: RecordType = RecordType(0x02);
     /// The height in the chain of most work to start scanning for transactions.
-    pub const RECOVERY_HEIGHT: RecordType = RecordType(0x03);
+    const RECOVERY_HEIGHT: RecordType = RecordType(0x03);
     /// A descriptor that is used to receive payments.
-    pub const EXTERNAL_DESCRIPTOR: RecordType = RecordType(0x04);
+    const EXTERNAL_DESCRIPTOR: RecordType = RecordType(0x04);
     /// A descriptor that is used to receive change when transacting.
-    pub const INTERNAL_DESCRIPTOR: RecordType = RecordType(0x05);
+    const INTERNAL_DESCRIPTOR: RecordType = RecordType(0x05);
 }
 
 impl From<RecordType> for u8 {
@@ -60,7 +60,7 @@ impl Display for Record {
                 write!(f, "Receiving descriptor: {desc}")
             }
             Record::InternalDescriptor(desc) => {
-                write!(f, "Changer descriptor: {desc}")
+                write!(f, "Change descriptor: {desc}")
             }
         }
     }
@@ -162,8 +162,15 @@ pub fn encode_records(records: Vec<Record>) -> Result<Vec<u8>, Error> {
         .try_into()
         .map_err(|_| Error::RecordCountOverflow)?;
     buf.extend_from_slice(&len.to_le_bytes());
+    let mut has_descriptor = false;
     for record in records {
+        if matches!(record, Record::InternalDescriptor(_) | Record::ExternalDescriptor(_)) {
+            has_descriptor = true
+        }
         buf.extend(&record.encode()?)
+    }
+    if !has_descriptor {
+        return Err(Error::NoDescriptor)
     }
     Ok(buf)
 }
@@ -178,6 +185,7 @@ pub fn decode_records(mut reader: impl std::io::Read + Send + Sync) -> Result<Ve
         .map_err(|_| Error::UnexpectedEOF)?;
     let len = u8::from_le_bytes(len_byte);
     let mut record_count = 0;
+    let mut has_descriptor = false;
     while record_count < len {
         // Read off the message type
         let mut message_byte = [0; 1];
@@ -229,6 +237,7 @@ pub fn decode_records(mut reader: impl std::io::Read + Send + Sync) -> Result<Ve
                 let desc = desc_string
                     .parse::<Descriptor<DescriptorPublicKey>>()
                     .map_err(|_| Error::InvalidDescriptor)?;
+                has_descriptor = true;
                 Record::ExternalDescriptor(desc)
             }
             RecordType::INTERNAL_DESCRIPTOR => {
@@ -236,6 +245,7 @@ pub fn decode_records(mut reader: impl std::io::Read + Send + Sync) -> Result<Ve
                 let desc = desc_string
                     .parse::<Descriptor<DescriptorPublicKey>>()
                     .map_err(|_| Error::InvalidDescriptor)?;
+                has_descriptor = true;
                 Record::InternalDescriptor(desc)
             }
             _ => return Err(Error::UnknownMessageType),
@@ -243,7 +253,42 @@ pub fn decode_records(mut reader: impl std::io::Read + Send + Sync) -> Result<Ve
         records.push(record);
         record_count += 1;
     }
+    if !has_descriptor {
+        return Err(Error::NoDescriptor)
+    }
     Ok(records)
+}
+
+/// A structured import from a vector of records.
+pub struct Import {
+    pub name: Option<String>,   
+    pub description: Option<String>,
+    pub info: Option<String>,
+    pub height: Option<u32>,
+    pub external: Option<Descriptor<DescriptorPublicKey>>,
+    pub internal: Option<Descriptor<DescriptorPublicKey>>,
+}
+
+impl Import {
+    pub fn from_vec(records: Vec<Record>) -> Self {
+        let mut name = None;  
+        let mut description = None;
+        let mut info = None;
+        let mut height = None;
+        let mut external = None;
+        let mut internal = None;
+        for record in records {
+            match record {
+                Record::Name(s) => name = Some(s),
+                Record::Description(d) => description = Some(d),
+                Record::Info(i) => info = Some(i),
+                Record::RecoveryHeight(h) => height = Some(h),
+                Record::ExternalDescriptor(e) => external = Some(e),
+                Record::InternalDescriptor(i) => internal = Some(i),
+            }
+        }
+        Import { name, description, info, height, external, internal }
+    }
 }
 
 /// Possible errors when encoding and decoding a WDEF
@@ -265,6 +310,8 @@ pub enum Error {
     InvalidHeightEncoding,
     /// A string did not parse into a descriptor properly.
     InvalidDescriptor,
+    /// A string did not parse into a descriptor properly.
+    NoDescriptor,
 }
 
 impl Display for Error {
@@ -286,6 +333,7 @@ impl Display for Error {
                 write!(f, "the height could not be fit into a 4 byte slice.")
             }
             Error::InvalidDescriptor => write!(f, "the descriptor could not be parsed."),
+            Error::NoDescriptor => write!(f, "no descriptor was present in the file."),
         }
     }
 }

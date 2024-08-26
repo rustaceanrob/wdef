@@ -59,6 +59,8 @@ The number of records to be recorded in the file should be determined first, and
 
 Next, each record is composed as `Type || Length || Value || Checksum`, and each array of bytes are concatinated together. Encoding fails if the `Length` cannot be represented as a 16-bit unsigned integer.
 
+If no descriptor was present, encoding fails.
+
 #### Decoding Files
 
 The first byte is read from the file and interpreted as the number of records. For each record in the record count:
