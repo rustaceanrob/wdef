@@ -164,13 +164,16 @@ pub fn encode_records(records: Vec<Record>) -> Result<Vec<u8>, Error> {
     buf.extend_from_slice(&len.to_le_bytes());
     let mut has_descriptor = false;
     for record in records {
-        if matches!(record, Record::InternalDescriptor(_) | Record::ExternalDescriptor(_)) {
+        if matches!(
+            record,
+            Record::InternalDescriptor(_) | Record::ExternalDescriptor(_)
+        ) {
             has_descriptor = true
         }
         buf.extend(&record.encode()?)
     }
     if !has_descriptor {
-        return Err(Error::NoDescriptor)
+        return Err(Error::NoDescriptor);
     }
     Ok(buf)
 }
@@ -254,14 +257,14 @@ pub fn decode_records(mut reader: impl std::io::Read + Send + Sync) -> Result<Ve
         record_count += 1;
     }
     if !has_descriptor {
-        return Err(Error::NoDescriptor)
+        return Err(Error::NoDescriptor);
     }
     Ok(records)
 }
 
-/// A structured import from a vector of records.
+/// A structured import from a vector of [`Record`].
 pub struct Import {
-    pub name: Option<String>,   
+    pub name: Option<String>,
     pub description: Option<String>,
     pub info: Option<String>,
     pub height: Option<u32>,
@@ -270,24 +273,33 @@ pub struct Import {
 }
 
 impl Import {
-    pub fn from_vec(records: Vec<Record>) -> Self {
-        let mut name = None;  
-        let mut description = None;
-        let mut info = None;
-        let mut height = None;
-        let mut external = None;
-        let mut internal = None;
+    /// Construct an import from a list of [`Record`].
+    pub fn from_records(records: Vec<Record>) -> Self {
+        let mut import = Import::default();
         for record in records {
             match record {
-                Record::Name(s) => name = Some(s),
-                Record::Description(d) => description = Some(d),
-                Record::Info(i) => info = Some(i),
-                Record::RecoveryHeight(h) => height = Some(h),
-                Record::ExternalDescriptor(e) => external = Some(e),
-                Record::InternalDescriptor(i) => internal = Some(i),
+                Record::Name(s) => import.name = Some(s),
+                Record::Description(d) => import.description = Some(d),
+                Record::Info(i) => import.info = Some(i),
+                Record::RecoveryHeight(h) => import.height = Some(h),
+                Record::ExternalDescriptor(e) => import.external = Some(e),
+                Record::InternalDescriptor(i) => import.internal = Some(i),
             }
         }
-        Import { name, description, info, height, external, internal }
+        import
+    }
+}
+
+impl Default for Import {
+    fn default() -> Self {
+        Self {
+            name: Default::default(),
+            description: Default::default(),
+            info: Default::default(),
+            height: Default::default(),
+            external: Default::default(),
+            internal: Default::default(),
+        }
     }
 }
 

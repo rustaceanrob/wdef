@@ -1,6 +1,9 @@
 use std::io::Write;
 
-use miniscript::{bitcoin::{key::Secp256k1, secp256k1::SecretKey, Network, PrivateKey, PublicKey}, descriptor::{SinglePub, SinglePubKey}};
+use miniscript::{
+    bitcoin::{key::Secp256k1, secp256k1::SecretKey, Network, PrivateKey, PublicKey},
+    descriptor::{SinglePub, SinglePubKey},
+};
 use wdef::{decode_records, encode_records, Descriptor, DescriptorPublicKey, Record};
 
 fn main() {
