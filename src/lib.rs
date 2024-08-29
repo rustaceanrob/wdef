@@ -4,6 +4,9 @@ use miniscript::bitcoin::hashes::{sha256, Hash};
 
 pub use miniscript::{Descriptor, DescriptorPublicKey};
 
+const PROTOCOL_VERSION: u8 = 0x00;
+const FILE_MAGIC: [u8; 7] = [0x00, 0x00, 0x00, 0x57, 0x44, 0x45, 0x46];
+
 /// A type of record that may be recorded in a WDEF file.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
 struct RecordType(u8);
@@ -157,6 +160,8 @@ impl Record {
 /// Encode records into a byte array.
 pub fn encode_records(records: Vec<Record>) -> Result<Vec<u8>, Error> {
     let mut buf = Vec::new();
+    buf.extend(FILE_MAGIC);
+    buf.extend(PROTOCOL_VERSION.to_le_bytes());
     let len: u8 = records
         .len()
         .try_into()
@@ -181,7 +186,24 @@ pub fn encode_records(records: Vec<Record>) -> Result<Vec<u8>, Error> {
 /// Decode a sequence of records from a file.
 pub fn decode_records(mut reader: impl std::io::Read + Send + Sync) -> Result<Vec<Record>, Error> {
     let mut records = Vec::new();
-    // The first byte commits to the length
+    // Read and match the magic
+    let mut magic = [0; 7];
+    reader
+        .read_exact(&mut magic)
+        .map_err(|_| Error::UnexpectedEOF)?;
+    if magic.ne(&FILE_MAGIC) {
+        return Err(Error::IncorrectMagic);
+    }
+    // Read the protocol version
+    let mut version = [0; 1];
+    reader
+        .read_exact(&mut version)
+        .map_err(|_| Error::UnexpectedEOF)?;
+    let version_number = u8::from_le_bytes(version);
+    if version_number > 0 {
+        return Err(Error::UnsupportedVersion)
+    }
+    // The first byte of the message commits to the length
     let mut len_byte = [0; 1];
     reader
         .read_exact(&mut len_byte)
@@ -264,6 +286,7 @@ pub fn decode_records(mut reader: impl std::io::Read + Send + Sync) -> Result<Ve
 
 /// A structured import from a vector of [`Record`].
 pub struct Import {
+    pub length: [u8; 2],
     pub name: Option<String>,
     pub description: Option<String>,
     pub info: Option<String>,
@@ -274,8 +297,10 @@ pub struct Import {
 
 impl Import {
     /// Construct an import from a list of [`Record`].
-    pub fn from_records(records: Vec<Record>) -> Self {
+    pub fn from_records(records: Vec<Record>) -> Result<Self, Error> {
         let mut import = Import::default();
+        let records_len: u16 = records.len().try_into().map_err(|_| Error::RecordLengthOverflow)?;
+        import.length = records_len.to_le_bytes();
         for record in records {
             match record {
                 Record::Name(s) => import.name = Some(s),
@@ -286,13 +311,14 @@ impl Import {
                 Record::InternalDescriptor(i) => import.internal = Some(i),
             }
         }
-        import
+        Ok(import)
     }
 }
 
 impl Default for Import {
     fn default() -> Self {
         Self {
+            length: Default::default(),
             name: Default::default(),
             description: Default::default(),
             info: Default::default(),
@@ -324,6 +350,10 @@ pub enum Error {
     InvalidDescriptor,
     /// A string did not parse into a descriptor properly.
     NoDescriptor,
+    /// The file signature is incorrect
+    IncorrectMagic,
+    /// The version was correctly parsed, but the current software does not support it.
+    UnsupportedVersion,
 }
 
 impl Display for Error {
@@ -346,6 +376,8 @@ impl Display for Error {
             }
             Error::InvalidDescriptor => write!(f, "the descriptor could not be parsed."),
             Error::NoDescriptor => write!(f, "no descriptor was present in the file."),
+            Error::IncorrectMagic => write!(f, "the file magic was not correct."),
+            Error::UnsupportedVersion => write!(f, "the version was correctly parsed, but the current software does not support it."),
         }
     }
 }
