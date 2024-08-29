@@ -17,17 +17,21 @@ Futher still, metadata about the descriptors, such as the name of the wallet, a 
 
 ### Definitions
 
+_descriptor_, shorthand for "output descriptor."
+
 `||` denotes the concatenation of two elements.
 
 `[]bytes` represents a variable array of bytes.
 
 `[N]bytes` represents an array of `N` bytes.
 
-`Record` is an entry in a file.
+`Import` an entry in the file that describes metadata and associated descriptors.
 
-_descriptor_, shorthand for "output descriptor"
+`Record` is an entry in an import.
 
 ### Specification
+
+#### `Record` 
 
 Information is stored in a WDEF file in the form of `Record`s. A `Record` is a tuple of a `Type`, `Length`, and `Value`, followed by a 4 byte checksum. Every WDEF file is prefixed with a single byte representing the number of records in the file. A record type is represented as a byte, with possible types listed below:
 
@@ -53,9 +57,17 @@ A `Record` is completely defined as:
 - `Value`: `[]bytes` variable length contents representing the record type, often a UTF-8 encoded string
 - `Checksum`: `[4]bytes` a commitment to the record type and record value
 
+#### `Import`
+
+#### File Prefix
+
+Every WDEF file is prefixed with seven bytes of data that identifies the file: `0x00, 0x00, 0x00, 0x57, 0x44, 0x45, 0x46`. This data is followed by the protocol version, which is set to `0x00` for version one.
+
 #### Encoding Files
 
-The number of records to be recorded in the file should be determined first, and the byte representing the length is added to the serialization buffer. If the number of records cannot fit into an 8-bit unsigned integer, encoding fails.
+First, the seven bytes of the file identifier and single verison byte are written to the file.
+
+Next, the number of records to be recorded in the file should be determined first, and the byte representing the length is added to the serialization buffer. If the number of records cannot fit into an 8-bit unsigned integer, encoding fails.
 
 Next, each record is composed as `Type || Length || Value || Checksum`, and each array of bytes are concatinated together. Encoding fails if the `Length` cannot be represented as a 16-bit unsigned integer.
 
@@ -63,7 +75,9 @@ If no descriptor was present, encoding fails.
 
 #### Decoding Files
 
-The first byte is read from the file and interpreted as the number of records. For each record in the record count:
+Read the first seven bytes of the file, failing the decoding if the file identifier does not match. Read the next byte and interpret it as the version. For versions greater than those supported by the software, decoding fails. All WDEF decoders must implement `0x00`.
+
+The next byte is read from the file and interpreted as the number of records. For each record in the record count:
 
 1. Read and interpret the first byte as the `Type`. Decoding fails for unrecognized `Type` values.
 
