@@ -25,9 +25,10 @@ _descriptor_, shorthand for "output descriptor."
 
 `[N]bytes` represents an array of `N` bytes.
 
+`Record` is an entry in an import.
+
 `Import` an entry in the file that describes metadata and associated descriptors.
 
-`Record` is an entry in an import.
 
 ### Specification
 
@@ -43,10 +44,11 @@ Information is stored in a WDEF file in the form of `Record`s. A `Record` is a t
 | RecoveryHeight | 0x03 | Height in the blockchain this wallet began to receive and send payments |
 | ExternalDescriptor | 0x04 | A descriptor that is used to receive bitcoins. Encodes public keys and cannot spend bitcoins |
 | InternalDescriptor | 0x05 | A descriptor that is used to generate change outputs when spending bitcoins. Encodes public keys and cannot spend bitcoins |
+| MultipathDescriptor | 0x06 | A descriptor that encodes multiple paths to unique descriptors. |
 
 A `Length` is a 16-bit number represented as bytes in _little endian_. The length represents the number of bytes in the value encoding that follows.
 
-`Name`, `Description`, `Info`, and `ExternalDescriptor`, `InternalDescriptor` are all represented as strings and encoded as the UTF-8 byte array
+`Name`, `Description`, `Info`, `ExternalDescriptor`, `InternalDescriptor`, and `MultipathDescriptor` are all represented as strings and encoded as the UTF-8 byte array
 for such a string representation. `RecoveryHeight`s are represented as a 4 byte _little endian_ array representation.
 
 The checksum for a `Record` is calculated by `SHA256( Type || Value )` and taking the first four bytes of the resulting hash.
@@ -59,19 +61,39 @@ A `Record` is completely defined as:
 
 #### `Import`
 
+An `Import` is simply a structured list of `Record`s. An import contains a single byte that represents the count of `Record`s in the file, followed by the `Record`s. All `Import`s must adhere to these requirements, or the file is invalid:
+
+- A single `Name` is required.
+- Any `Description` must be unique, but is not required.
+- Any number of `Info` may be included.
+- A `RecoveryHeight` may be provided, but is not required. The `RecoveryHeight` must be unique.
+- Any number of `ExternalDescriptor`, `InternalDescriptor`, or `MultipathDescriptor` may be provided.
+- At least one `ExternalDescriptor` or `MultipathDescriptor` must exist. 
+
+An `Import` is encoded as:
+- `Length`: `[1]bytes` _little endian_ integer representing the `Record` count
+- `Record`s: `[]bytes` the entries of the file.
+
 #### File Prefix
 
 Every WDEF file is prefixed with seven bytes of data that identifies the file: `0x00, 0x00, 0x00, 0x57, 0x44, 0x45, 0x46`. This data is followed by the protocol version, which is set to `0x00` for version one.
+
+#### Complete Structure
+
+- File identifier: `0x00, 0x00, 0x00, 0x57, 0x44, 0x45, 0x46`
+- `Version`: `[1]bytes`
+- `Length`: `[1]bytes`
+- `Record`s: `[]bytes`
 
 #### Encoding Files
 
 First, the seven bytes of the file identifier and single verison byte are written to the file.
 
-Next, the number of records to be recorded in the file should be determined first, and the byte representing the length is added to the serialization buffer. If the number of records cannot fit into an 8-bit unsigned integer, encoding fails.
+Next, the number of records to be recorded in the file should be determined, and the byte representing the length is added to the serialization buffer. If the number of records cannot fit into an 8-bit unsigned integer, encoding fails.
 
 Next, each record is composed as `Type || Length || Value || Checksum`, and each array of bytes are concatinated together. Encoding fails if the `Length` cannot be represented as a 16-bit unsigned integer.
 
-If no descriptor was present, encoding fails.
+If any of the `Import` requirements are violated, encoding fails.
 
 #### Decoding Files
 
@@ -91,7 +113,7 @@ The next byte is read from the file and interpreted as the number of records. Fo
 
 6. For descriptors, parse the computed string and attempt to cast it to a descriptor that encodes public keys. Decoding fails for if the provided string cannot be cast to a public key descriptor.
 
-If one or more descriptors are not present, decoding fails.
+After all the `Record`s have been collected, evalutate if the collection follows the rules for an `Import`. Decoding fails if a rule is violated.
 
 Files adhering to this standard should be postfixed with the `.wdef` extension.
 

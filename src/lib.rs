@@ -210,7 +210,6 @@ pub fn decode_records(mut reader: impl std::io::Read + Send + Sync) -> Result<Ve
         .map_err(|_| Error::UnexpectedEOF)?;
     let len = u8::from_le_bytes(len_byte);
     let mut record_count = 0;
-    let mut has_descriptor = false;
     while record_count < len {
         // Read off the message type
         let mut message_byte = [0; 1];
@@ -262,7 +261,6 @@ pub fn decode_records(mut reader: impl std::io::Read + Send + Sync) -> Result<Ve
                 let desc = desc_string
                     .parse::<Descriptor<DescriptorPublicKey>>()
                     .map_err(|_| Error::InvalidDescriptor)?;
-                has_descriptor = true;
                 Record::ExternalDescriptor(desc)
             }
             RecordType::INTERNAL_DESCRIPTOR => {
@@ -270,16 +268,12 @@ pub fn decode_records(mut reader: impl std::io::Read + Send + Sync) -> Result<Ve
                 let desc = desc_string
                     .parse::<Descriptor<DescriptorPublicKey>>()
                     .map_err(|_| Error::InvalidDescriptor)?;
-                has_descriptor = true;
                 Record::InternalDescriptor(desc)
             }
             _ => return Err(Error::UnknownMessageType),
         };
         records.push(record);
         record_count += 1;
-    }
-    if !has_descriptor {
-        return Err(Error::NoDescriptor);
     }
     Ok(records)
 }
