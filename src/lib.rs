@@ -33,7 +33,6 @@ impl From<RecordType> for u8 {
 }
 
 /// Records and associated content.
-#[allow(dead_code)]
 #[derive(Debug)]
 pub enum Record {
     Name(String),
@@ -157,34 +156,8 @@ impl Record {
     }
 }
 
-/// Encode records into a byte array.
-pub fn encode_records(records: Vec<Record>) -> Result<Vec<u8>, Error> {
-    let mut buf = Vec::new();
-    buf.extend(FILE_MAGIC);
-    buf.extend(PROTOCOL_VERSION.to_le_bytes());
-    let len: u8 = records
-        .len()
-        .try_into()
-        .map_err(|_| Error::RecordCountOverflow)?;
-    buf.extend_from_slice(&len.to_le_bytes());
-    let mut has_descriptor = false;
-    for record in records {
-        if matches!(
-            record,
-            Record::InternalDescriptor(_) | Record::ExternalDescriptor(_)
-        ) {
-            has_descriptor = true
-        }
-        buf.extend(&record.encode()?)
-    }
-    if !has_descriptor {
-        return Err(Error::NoDescriptor);
-    }
-    Ok(buf)
-}
-
 /// Decode a sequence of records from a file.
-pub fn decode_records(mut reader: impl std::io::Read + Send + Sync) -> Result<Vec<Record>, Error> {
+pub fn decode_records(mut reader: impl std::io::Read + Send + Sync) -> Result<Import, Error> {
     let mut records = Vec::new();
     // Read and match the magic
     let mut magic = [0; 7];
@@ -275,37 +248,106 @@ pub fn decode_records(mut reader: impl std::io::Read + Send + Sync) -> Result<Ve
         records.push(record);
         record_count += 1;
     }
-    Ok(records)
+    Ok(Import::from_records(records)?)
 }
 
 /// A structured import from a vector of [`Record`].
 pub struct Import {
-    pub length: [u8; 2],
-    pub name: Option<String>,
-    pub description: Option<String>,
-    pub info: Option<String>,
-    pub height: Option<u32>,
-    pub external: Option<Descriptor<DescriptorPublicKey>>,
-    pub internal: Option<Descriptor<DescriptorPublicKey>>,
+    pub length: [u8; 1],
+    pub(crate) name: Option<String>,
+    pub(crate) description: Option<String>,
+    pub(crate) info: Vec<String>,
+    pub(crate) height: Option<u32>,
+    pub(crate) external: Vec<Descriptor<DescriptorPublicKey>>,
+    pub(crate) internal: Vec<Descriptor<DescriptorPublicKey>>,
 }
 
 impl Import {
     /// Construct an import from a list of [`Record`].
     pub fn from_records(records: Vec<Record>) -> Result<Self, Error> {
         let mut import = Import::default();
-        let records_len: u16 = records.len().try_into().map_err(|_| Error::RecordLengthOverflow)?;
+        let records_len: u8 = records.len().try_into().map_err(|_| Error::RecordLengthOverflow)?;
         import.length = records_len.to_le_bytes();
         for record in records {
             match record {
-                Record::Name(s) => import.name = Some(s),
-                Record::Description(d) => import.description = Some(d),
-                Record::Info(i) => import.info = Some(i),
-                Record::RecoveryHeight(h) => import.height = Some(h),
-                Record::ExternalDescriptor(e) => import.external = Some(e),
-                Record::InternalDescriptor(i) => import.internal = Some(i),
+                Record::Name(s) => {
+                    if import.name.is_some() {
+                        return Err(Error::NonuniqueName)
+                    }
+                    import.name = Some(s)
+                },
+                Record::Description(d) => {
+                    if import.description.is_some() {
+                        return Err(Error::NonuniqueDescription)
+                    }
+                    import.description = Some(d)
+                },
+                Record::Info(i) => import.info.push(i),
+                Record::RecoveryHeight(h) => {
+                    if import.height.is_some() {
+                        return Err(Error::NonuniqueHeight)
+                    }
+                    import.height = Some(h)
+                },
+                Record::ExternalDescriptor(e) => import.external.push(e),
+                Record::InternalDescriptor(i) => import.internal.push(i),
             }
         }
+        if import.name.is_none() {
+            return Err(Error::NoName)
+        }
+        if import.external.is_empty() {
+            return Err(Error::NoDescriptor)
+        }
         Ok(import)
+    }
+
+    pub fn encode(self) -> Vec<u8> {
+        let mut buf = Vec::new();
+        buf.extend(FILE_MAGIC);
+        buf.extend(PROTOCOL_VERSION.to_le_bytes());
+        buf.extend_from_slice(&self.length);
+        buf.extend(Record::Name(self.name.unwrap()).encode().unwrap());
+        if let Some(description) = self.description {
+            buf.extend(Record::Description(description).encode().unwrap());
+        }
+        if let Some(height) = self.height {
+            buf.extend(Record::RecoveryHeight(height).encode().unwrap());
+        }
+        for info in self.info {
+            buf.extend(Record::Info(info).encode().unwrap())
+        }
+        for ext in self.external {
+            buf.extend(Record::ExternalDescriptor(ext).encode().unwrap())
+        }
+        for inter in self.internal {
+            buf.extend(Record::InternalDescriptor(inter).encode().unwrap())
+        }
+        buf
+    }
+
+    pub fn name(&self) -> String {
+        self.name.clone().unwrap()
+    }
+
+    pub fn description(&self) -> Option<String> {
+        self.description.clone()
+    }
+
+    pub fn info(&self) -> Vec<String> {
+        self.info.clone()
+    }
+
+    pub fn height(&self) -> Option<u32> {
+        self.height
+    }
+
+    pub fn list_external_descriptors(&self) -> Vec<Descriptor<DescriptorPublicKey>> {
+        self.external.clone()
+    }
+
+    pub fn list_internal_descriptors(&self) -> Vec<Descriptor<DescriptorPublicKey>> {
+        self.internal.clone()
     }
 }
 
@@ -348,6 +390,14 @@ pub enum Error {
     IncorrectMagic,
     /// The version was correctly parsed, but the current software does not support it.
     UnsupportedVersion,
+    /// Imports must have a name.
+    NoName,
+    /// Imports must only have a single name.
+    NonuniqueName,
+    /// Imports must only have a single description.
+    NonuniqueDescription,
+    /// Imports must only have a single recovery height.
+    NonuniqueHeight
 }
 
 impl Display for Error {
@@ -372,6 +422,10 @@ impl Display for Error {
             Error::NoDescriptor => write!(f, "no descriptor was present in the file."),
             Error::IncorrectMagic => write!(f, "the file magic was not correct."),
             Error::UnsupportedVersion => write!(f, "the version was correctly parsed, but the current software does not support it."),
+            Error::NoName => write!(f, "imports must have a name."),
+            Error::NonuniqueName => write!(f, "imports must only have a single name."),
+            Error::NonuniqueDescription => write!(f, "imports must only have a single description."),
+            Error::NonuniqueHeight => write!(f, "imports must only have a single recovery height.")
         }
     }
 }

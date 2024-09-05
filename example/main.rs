@@ -4,7 +4,7 @@ use miniscript::{
     bitcoin::{key::Secp256k1, secp256k1::SecretKey, Network, PrivateKey, PublicKey},
     descriptor::{SinglePub, SinglePubKey},
 };
-use wdef::{decode_records, encode_records, Descriptor, DescriptorPublicKey, Record};
+use wdef::{decode_records, Descriptor, DescriptorPublicKey, Import, Record};
 
 fn main() {
     // Wallet metadata
@@ -25,7 +25,7 @@ fn main() {
     let desc_record = Record::ExternalDescriptor(desc);
     // Write the records to a file
     let records = vec![name, description, info, height, desc_record];
-    let buf = encode_records(records).unwrap();
+    let buf = Import::from_records(records).unwrap().encode();
     let file = std::fs::File::create("my_wallet.wdef").unwrap();
     let mut writer = std::io::BufWriter::new(&file);
     writer.write_all(&buf).unwrap();
@@ -36,8 +36,9 @@ fn main() {
     let file = std::fs::File::open("my_wallet.wdef").unwrap();
     let reader = std::io::BufReader::new(&file);
     // Decode into a list of records
-    let records = decode_records(reader).unwrap();
-    for record in records {
-        println!("{record}");
+    let import = decode_records(reader).unwrap();
+    println!("Wallet name {}", import.name());
+    for record in import.list_external_descriptors() {
+        println!("External descriptor: {record}");
     }
 }
